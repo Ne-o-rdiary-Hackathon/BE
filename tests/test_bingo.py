@@ -276,3 +276,79 @@ def test_old_board_without_mission_text_uses_activity_name(env) -> None:
         db.commit()
     cells = call("GET", "/api/rooms/1/bingo-board").json()["data"]["cells"]
     assert all(c["mission_text"] == c["activity_name"] for c in cells)
+
+
+def _add_member(env, user_id: int, nickname: str, submitted: bool) -> None:
+    with env["Session"]() as db:
+        db.add(User(user_id=user_id, kakao_id=200 + user_id, nickname=nickname))
+        db.add(RoomMember(room_id=1, user_id=user_id, role="MEMBER"))
+        if submitted:
+            db.add(UserResponse(room_id=1, user_id=user_id, status="SUBMITTED"))
+        db.commit()
+
+
+def _set_max_members(env, max_members: int) -> None:
+    with env["Session"]() as db:
+        db.get(Room, 1).max_members = max_members
+        db.commit()
+
+
+def _board_exists(env) -> bool:
+    with env["Session"]() as db:
+        return db.scalar(select(BingoCell.cell_id).limit(1)) is not None
+
+
+def test_create_board_requires_all_responses(env) -> None:
+    _add_member(env, 4, "미제출", submitted=False)
+    res = call("POST", "/api/rooms/1/bingo-board")
+    assert res.status_code == 409
+    assert res.json()["error"]["code"] == "RESPONSES_NOT_COMPLETE"
+    assert not _board_exists(env)
+
+
+def test_create_board_requires_two_members(env) -> None:
+    with env["Session"]() as db:
+        db.query(UserResponseActivity).filter(UserResponseActivity.response_id == 2).delete()
+        db.query(UserResponse).filter(UserResponse.user_id == MEMBER).delete()
+        db.query(RoomMember).filter(RoomMember.user_id == MEMBER).delete()
+        db.commit()
+    res = call("POST", "/api/rooms/1/bingo-board")
+    assert res.json()["error"]["code"] == "NOT_ENOUGH_MEMBERS"
+
+
+def test_auto_create_waits_until_room_is_full(env) -> None:
+    # 정원 4명 중 2명만 참여(둘 다 제출) → 자동 생성하지 않음 (방장 버튼은 가능)
+    with env["Session"]() as db:
+        assert BingoService(db, None).create_board_if_ready(1) is False
+    assert not _board_exists(env)
+
+
+def test_auto_create_when_full_and_all_submitted(env) -> None:
+    _set_max_members(env, 2)
+    with env["Session"]() as db:
+        assert BingoService(db, None).create_board_if_ready(1) is True
+    assert _board_exists(env)
+    with env["Session"]() as db:
+        assert db.get(Room, 1).status == "IN_PROGRESS"
+        # 이미 만들어졌으면 두 번째 호출은 조용히 False
+        assert BingoService(db, None).create_board_if_ready(1) is False
+
+
+def test_last_submit_via_api_creates_board_when_room_is_full(env) -> None:
+    """설문 제출 API로 마지막(정원을 채운) 멤버가 제출하면 빙고판이 자동 생성된다."""
+    from app.api.home_dependencies import get_current_user_id
+
+    _set_max_members(env, 3)
+    with env["Session"]() as db:
+        db.add(User(user_id=4, kakao_id=204, nickname="마지막"))
+        db.add(RoomMember(room_id=1, user_id=4, role="MEMBER"))
+        db.commit()
+    app.dependency_overrides[get_current_user_id] = lambda: 4
+
+    res = call("POST", "/api/v1/rooms/1/responses/me/submit",
+               json={"desired_activity_ids": [7], "bored_activity_ids": []})
+    assert res.status_code == 200, res.text
+    assert res.json()["data"] == {"status": "SUBMITTED", "all_members_submitted": True, "board_created": True}
+    assert _board_exists(env)
+    board = call("GET", "/api/rooms/1/bingo-board").json()["data"]
+    assert board["room_status"] == "IN_PROGRESS" and len(board["cells"]) == 9

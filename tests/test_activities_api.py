@@ -135,6 +135,7 @@ def test_submit_activity_response_persists_selections_and_waits_for_members(
     assert response.json()["data"] == {
         "status": "SUBMITTED",
         "all_members_submitted": False,
+        "board_created": False,
     }
 
     with Session(database_engine) as db:
@@ -183,6 +184,7 @@ def test_submit_activity_response_reports_all_members_and_replaces_previous_choi
     assert response.json()["data"] == {
         "status": "SUBMITTED",
         "all_members_submitted": True,
+        "board_created": False,
     }
 
 

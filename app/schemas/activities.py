@@ -44,3 +44,5 @@ class ActivitySubmissionRequest(BaseModel):
 class ActivitySubmissionResponse(BaseModel):
     status: Literal["SUBMITTED"]
     all_members_submitted: bool
+    # 이번 제출로 빙고판이 자동 생성됐는지 (true면 바로 빙고판 화면으로 이동)
+    board_created: bool = False

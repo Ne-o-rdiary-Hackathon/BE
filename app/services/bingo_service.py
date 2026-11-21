@@ -42,6 +42,15 @@ LINES: tuple[tuple[int, int, int], ...] = (
 
 _rng = random.Random()
 
+# 자동 생성 시 "아직 만들 때가 아님"으로 보고 조용히 넘어가는 에러들
+_NOT_READY_CODES = {
+    ErrorCode.BOARD_ALREADY_EXISTS,
+    ErrorCode.ROOM_NOT_RECRUITING,
+    ErrorCode.NOT_ENOUGH_MEMBERS,
+    ErrorCode.ROOM_NOT_FULL,
+    ErrorCode.RESPONSES_NOT_COMPLETE,
+}
+
 
 def completed_lines(completed_positions: set[int]) -> list[tuple[int, int, int]]:
     return [line for line in LINES if all(p in completed_positions for p in line)]
@@ -63,15 +72,34 @@ class BingoService:
     # ───────────────────────── BINGO-01 빙고판 생성 ─────────────────────────
 
     def create_board(self, room_id: int, user: User) -> BingoBoardResponse:
+        """방장이 버튼으로 만드는 경우."""
+        return self._create_board(room_id, owner=user)
+
+    def create_board_if_ready(self, room_id: int) -> bool:
+        """마지막 멤버가 제출한 직후 호출합니다. 정원이 다 찼고 전원 제출했으면 빙고판을 만듭니다.
+
+        조건이 안 맞거나 다른 요청이 먼저 만들었으면 False를 돌려주고, 아무것도 바꾸지 않습니다.
+        """
+        try:
+            self._create_board(room_id, owner=None, require_full_room=True)
+            return True
+        except BusinessException as exc:
+            if exc.code in _NOT_READY_CODES:
+                return False
+            raise
+
+    def _create_board(self, room_id: int, owner: User | None, require_full_room: bool = False) -> BingoBoardResponse:
         try:
             room = self._lock_room(room_id)
-            self._ensure_member(room_id, user)
-            if room.owner_id != user.user_id:
-                raise BusinessException(ErrorCode.NOT_ROOM_OWNER)
+            if owner is not None:
+                self._ensure_member(room_id, owner)
+                if room.owner_id != owner.user_id:
+                    raise BusinessException(ErrorCode.NOT_ROOM_OWNER)
             if self._find_board(room_id) is not None:
                 raise BusinessException(ErrorCode.BOARD_ALREADY_EXISTS)
             if room.status != RoomStatus.RECRUITING:
                 raise BusinessException(ErrorCode.ROOM_NOT_RECRUITING)
+            self._ensure_ready(room, require_full_room)
 
             votes = self._activity_votes(room_id)
             board = BingoBoard(room_id=room_id, board_size=BOARD_SIZE)
@@ -89,6 +117,31 @@ class BingoService:
 
         self.db.refresh(board)
         return self._board_response(room, board, votes)
+
+    def _ensure_ready(self, room: Room, require_full_room: bool) -> None:
+        """멤버 2명 이상 + 전원 제출(+ 자동 생성이면 정원 가득)인지 확인합니다."""
+        member_count = self.db.scalar(
+            select(func.count()).select_from(RoomMember).where(RoomMember.room_id == room.room_id)
+        ) or 0
+        if member_count < 2:
+            raise BusinessException(ErrorCode.NOT_ENOUGH_MEMBERS)
+        if require_full_room and member_count < room.max_members:
+            raise BusinessException(ErrorCode.ROOM_NOT_FULL)
+
+        submitted_count = self.db.scalar(
+            select(func.count())
+            .select_from(RoomMember)
+            .join(
+                UserResponse,
+                (UserResponse.room_id == RoomMember.room_id) & (UserResponse.user_id == RoomMember.user_id),
+            )
+            .where(RoomMember.room_id == room.room_id, UserResponse.status == ResponseStatus.SUBMITTED)
+        ) or 0
+        if submitted_count < member_count:
+            raise BusinessException(
+                ErrorCode.RESPONSES_NOT_COMPLETE,
+                f"아직 응답을 제출하지 않은 멤버가 있습니다. ({submitted_count}/{member_count})",
+            )
 
     def _fill_cells(self, board: BingoBoard, room_id: int, votes: dict[int, tuple[int, int]]) -> None:
         chosen = self._choose_activities(votes)
