@@ -1,0 +1,28 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: EC2에 배포
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/BE
+            git pull origin main
+            docker build -t kankan-be .
+            docker rm -f kankan-be || true
+            docker run -d --name kankan-be --restart unless-stopped \
+              --env-file .env -p 127.0.0.1:8080:8080 kankan-be
+            docker image prune -f
+            sleep 5
+            curl -fsS http://localhost:8080/api/health
