@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Path
@@ -22,6 +23,23 @@ from app.schemas.common import (
 )
 
 router = APIRouter(tags=["활동"])
+log = logging.getLogger("backend.activities")
+
+
+def try_create_board(db: Session, room_id: int) -> bool:
+    """마지막 제출 직후 빙고판 자동 생성을 시도합니다.
+
+    자동 생성이 실패해도 방금 저장한 제출은 그대로 두고, 방장이 버튼으로 다시 만들 수 있습니다.
+    """
+    from app.services.bingo_service import BingoService
+    from app.services.image_storage import get_image_storage
+
+    try:
+        return BingoService(db, get_image_storage()).create_board_if_ready(room_id)
+    except Exception:
+        db.rollback()
+        log.exception("빙고판 자동 생성 실패 (room_id=%s)", room_id)
+        return False
 
 
 @router.get(
@@ -208,9 +226,13 @@ def submit_activity_response(
     ).scalar_one()
     db.commit()
 
+    # 정원이 다 찼고 이번 제출로 전원이 제출했으면 빙고판을 바로 만듭니다.
+    board_created = remaining_members == 0 and try_create_board(db, room_id)
+
     return ok(
         ActivitySubmissionResponse(
             status="SUBMITTED",
             all_members_submitted=remaining_members == 0,
+            board_created=board_created,
         )
     )

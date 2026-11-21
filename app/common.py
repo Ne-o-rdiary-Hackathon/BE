@@ -39,6 +39,9 @@ class ErrorCode(Enum):
     IMAGE_UPLOAD_FAILED = (502, "사진을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.")
     ROOM_NOT_RECRUITING = (409, "모집 중인 방에서만 가능한 요청입니다.")
     ROOM_FULL = (409, "방 정원이 가득 찼습니다.")
+    NOT_ENOUGH_MEMBERS = (409, "빙고판을 만들려면 멤버가 2명 이상이어야 합니다.")
+    RESPONSES_NOT_COMPLETE = (409, "아직 응답을 제출하지 않은 멤버가 있습니다.")
+    ROOM_NOT_FULL = (409, "방 정원이 아직 다 차지 않았습니다.")
     INTERNAL_ERROR = (500, "서버 오류가 발생했습니다.")
 
     @property
