@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     app_env: str = "production"
     dev_auth_enabled: bool = False
 
+    # 인증 사진 저장소. S3_BUCKET이 비어 있으면 로컬 UPLOAD_DIR에 저장하고 /uploads 로 제공합니다.
+    s3_bucket: str = ""
+    aws_region: str = "ap-northeast-2"
+    upload_dir: str = "uploads"
+
     @property
     def cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]

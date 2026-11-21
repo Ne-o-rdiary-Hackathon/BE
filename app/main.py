@@ -2,6 +2,7 @@
 API 문서(자동 생성): http://localhost:8080/docs
 """
 import logging
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -9,9 +10,10 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api import activities, auth, health, home
+from app.api import activities, auth, bingo, health, home
 from app.common import BusinessException, ErrorCode, fail
 from app.core.config import settings
 
@@ -84,6 +86,12 @@ app.include_router(auth.router)
 app.include_router(home.router)
 app.include_router(home.bingo_router)
 app.include_router(activities.router)
+app.include_router(bingo.router)
+
+# S3를 설정하지 않은 개발 환경에서는 인증 사진을 로컬 폴더에서 제공합니다.
+if not settings.s3_bucket:
+    Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
 
 
 def custom_openapi() -> dict[str, Any]:
