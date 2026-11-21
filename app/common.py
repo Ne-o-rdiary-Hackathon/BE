@@ -28,7 +28,6 @@ class ErrorCode(Enum):
     ROOM_NOT_FOUND = (404, "방을 찾을 수 없습니다.")
     NOT_ROOM_MEMBER = (403, "이 방의 멤버가 아닙니다.")
     NOT_ROOM_OWNER = (403, "방장만 빙고판을 만들 수 있습니다.")
-    ROOM_NOT_RECRUITING = (400, "모집 중인 방에서만 빙고판을 만들 수 있습니다.")
     ROOM_NOT_IN_PROGRESS = (400, "진행 중인 방에서만 인증할 수 있습니다.")
     BOARD_ALREADY_EXISTS = (409, "이미 빙고판이 만들어진 방입니다.")
     BOARD_NOT_FOUND = (404, "아직 빙고판이 만들어지지 않았습니다.")
@@ -38,6 +37,8 @@ class ErrorCode(Enum):
     INVALID_IMAGE = (400, "jpg, png, webp 형식의 사진만 올릴 수 있습니다.")
     IMAGE_TOO_LARGE = (413, "사진은 10MB 이하만 올릴 수 있습니다.")
     IMAGE_UPLOAD_FAILED = (502, "사진을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.")
+    ROOM_NOT_RECRUITING = (409, "모집 중인 방에서만 가능한 요청입니다.")
+    ROOM_FULL = (409, "방 정원이 가득 찼습니다.")
     INTERNAL_ERROR = (500, "서버 오류가 발생했습니다.")
 
     @property

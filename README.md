@@ -39,6 +39,15 @@ uvicorn app.main:app --reload --port 8080
 ```
 API 문서(자동 생성): http://localhost:8080/docs
 
+활동 API:
+
+| API | 설명 |
+|---|---|
+| `GET /api/v1/activities` | 활성 카테고리·하위 카테고리·활동 목록 조회 |
+| `POST /api/v1/rooms/{roomId}/responses/me/submit` | 로그인한 방 참여자의 원하는/싫은 활동 제출 |
+
+활동 제출은 `desired_activity_ids`와 `bored_activity_ids`를 전달합니다. 제출하면 기존 선택을 교체하고, 응답의 `all_members_submitted`가 `true`일 때 방 참여자 전원이 제출한 상태입니다. 초기 활동 카탈로그는 `alembic upgrade head`로 반영합니다.
+
 배포 시: `uvicorn app.main:app --host 0.0.0.0 --port 8080` (`--reload` 빼기)
 
 ## 3. 환경변수 (`.env`)
@@ -47,7 +56,18 @@ API 문서(자동 생성): http://localhost:8080/docs
 |---|---|---|
 | `DATABASE_URL` | `mysql+pymysql://gachi:gachi1234@localhost:3306/gachi?charset=utf8mb4` | 끝의 `?charset=utf8mb4` 꼭 유지 |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:5173` | 프론트 주소 (쉼표로 여러 개) |
+| `FRONTEND_BASE_URL` | `https://kankan-bingo.vercel.app` | 초대 링크를 만들 프론트엔드 기본 주소 (`.env.example`은 로컬 주소) |
 | `SHOW_SQL` | `false` | `true`면 SQL 로그 출력 |
+| `APP_ENV` | `production` | 앱 실행 환경 |
+| `DEV_AUTH_ENABLED` | `false` | `development` 환경에서만 Swagger 테스트용 사용자 헤더 허용 |
+
+로컬 Swagger에서 인증이 필요한 API를 테스트하려면 `.env`에 아래 값을 설정하고 서버를 재시작합니다.
+```env
+APP_ENV=development
+DEV_AUTH_ENABLED=true
+```
+이때 Swagger의 `X-Dev-User-Id` 헤더에 `users` 테이블에 존재하는 사용자 ID를 입력합니다.
+이 기능은 로컬 테스트 전용이며 배포 환경에서는 활성화하지 마세요.
 
 ## 4. 공통 규칙
 
