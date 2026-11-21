@@ -395,6 +395,33 @@ def test_openapi_documents_normalized_validation_status() -> None:
     assert {"200", "201", "409"} <= set(join_responses)
 
 
+def test_openapi_documents_dev_auth_header_only_when_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.main as main
+
+    original_schema = app.openapi_schema
+    try:
+        for app_env, dev_auth_enabled, expected in (
+            ("production", True, False),
+            ("development", False, False),
+            ("development", True, True),
+        ):
+            monkeypatch.setattr(
+                main,
+                "settings",
+                SimpleNamespace(app_env=app_env, dev_auth_enabled=dev_auth_enabled),
+            )
+            app.openapi_schema = None
+            parameters = app.openapi()["paths"]["/api/rooms"]["get"].get("parameters", [])
+            assert any(
+                parameter.get("name") == "X-Dev-User-Id"
+                for parameter in parameters
+            ) is expected
+    finally:
+        app.openapi_schema = original_schema
+
+
 def test_unhandled_error_returns_standard_internal_error(client: TestClient) -> None:
     db_override = app.dependency_overrides[get_db]
 

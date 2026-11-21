@@ -95,6 +95,15 @@ def custom_openapi() -> dict[str, Any]:
         for operation in path_item.values():
             if isinstance(operation, dict):
                 operation.get("responses", {}).pop("422", None)
+                if settings.app_env != "development" or not settings.dev_auth_enabled:
+                    operation["parameters"] = [
+                        parameter
+                        for parameter in operation.get("parameters", [])
+                        if not (
+                            parameter.get("in") == "header"
+                            and parameter.get("name", "").lower() == "x-dev-user-id"
+                        )
+                    ]
     app.openapi_schema = schema
     return schema
 
