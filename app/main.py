@@ -2,16 +2,18 @@
 API 문서(자동 생성): http://localhost:8080/docs
 """
 import logging
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.api import activities, auth, health, home
 from app.common import BusinessException, ErrorCode, fail
 from app.core.config import settings
-from app.api import auth, health
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("backend")
@@ -47,11 +49,24 @@ async def handle_validation(request: Request, e: RequestValidationError):
 
 @app.exception_handler(StarletteHTTPException)
 async def handle_http(request: Request, e: StarletteHTTPException):
-    if e.status_code == 404:
-        return JSONResponse(status_code=404, content=fail(ErrorCode.NOT_FOUND.name, ErrorCode.NOT_FOUND.message))
-    if e.status_code == 405:
-        return JSONResponse(status_code=405, content=fail(ErrorCode.METHOD_NOT_ALLOWED.name,
-                                                          ErrorCode.METHOD_NOT_ALLOWED.message))
+    known_errors = {
+        400: ErrorCode.INVALID_INPUT,
+        401: ErrorCode.UNAUTHORIZED,
+        403: ErrorCode.FORBIDDEN,
+        404: ErrorCode.NOT_FOUND,
+        405: ErrorCode.METHOD_NOT_ALLOWED,
+    }
+    error = known_errors.get(e.status_code)
+    if error is not None:
+        return JSONResponse(
+            status_code=error.status,
+            content=fail(error.name, error.message),
+        )
+    if e.status_code >= 500:
+        return JSONResponse(
+            status_code=ErrorCode.INTERNAL_ERROR.status,
+            content=fail(ErrorCode.INTERNAL_ERROR.name, ErrorCode.INTERNAL_ERROR.message),
+        )
     return JSONResponse(status_code=e.status_code, content=fail(f"HTTP_{e.status_code}", str(e.detail)))
 
 
@@ -66,3 +81,22 @@ async def handle_unknown(request: Request, e: Exception):
 
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(home.router)
+app.include_router(home.bingo_router)
+app.include_router(activities.router)
+
+
+def custom_openapi() -> dict[str, Any]:
+    if app.openapi_schema is not None:
+        return app.openapi_schema
+
+    schema = get_openapi(title=app.title, version=app.version, routes=app.routes)
+    for path_item in schema["paths"].values():
+        for operation in path_item.values():
+            if isinstance(operation, dict):
+                operation.get("responses", {}).pop("422", None)
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = custom_openapi
