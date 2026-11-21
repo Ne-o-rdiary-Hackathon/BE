@@ -29,6 +29,7 @@ from app.schemas.bingo import (
     VerificationResponse,
 )
 from app.services.image_storage import ImageStorage, detect_image_type
+from app.services.mission_writer import write_missions
 
 BOARD_SIZE = 3
 CELL_COUNT = BOARD_SIZE * BOARD_SIZE
@@ -91,6 +92,7 @@ class BingoService:
 
     def _fill_cells(self, board: BingoBoard, room_id: int, votes: dict[int, tuple[int, int]]) -> None:
         chosen = self._choose_activities(votes)
+        missions = write_missions([a.activity_name for a in chosen])
         member_count = self.db.scalar(
             select(func.count()).select_from(RoomMember).where(RoomMember.room_id == room_id)
         ) or 1
@@ -100,7 +102,7 @@ class BingoService:
         _rng.shuffle(others)
         positions = [CENTER, *others]
 
-        for activity, position in zip(chosen, positions):
+        for activity, position, mission in zip(chosen, positions, missions):
             desired, _ = votes.get(activity.activity_id, (0, 0))
             rate = min(Decimal(desired * 100) / Decimal(member_count), Decimal(100))
             self.db.add(BingoCell(
@@ -108,6 +110,7 @@ class BingoService:
                 activity_id=activity.activity_id,
                 position=position,
                 match_rate=rate.quantize(Decimal("0.01")),
+                mission_text=mission,
                 status=CellStatus.PENDING,
             ))
         self.db.flush()
@@ -298,6 +301,7 @@ class BingoService:
             cell_id=cell.cell_id,
             position=cell.position,
             activity_name=cell.activity.activity_name,
+            mission_text=cell.mission_text or cell.activity.activity_name,
             score=desired - bored,
             status=cell.status,
             image_url=self.storage.url(cell.verification.image_key) if cell.verification else None,

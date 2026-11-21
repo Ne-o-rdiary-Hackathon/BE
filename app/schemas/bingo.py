@@ -22,6 +22,7 @@ class BingoCellResponse(BaseModel):
     cell_id: int
     position: int
     activity_name: str
+    mission_text: str
     score: int
     status: str
     image_url: str | None
