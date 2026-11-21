@@ -1,7 +1,8 @@
 import secrets
 import string
 
-INVITE_URL_PREFIX = "https://kankan.app/invite"
+from app.core.config import settings
+
 _INVITE_CODE_ALPHABET = string.ascii_uppercase + string.digits
 
 
@@ -10,4 +11,4 @@ def generate_invite_code() -> str:
 
 
 def build_invite_url(invite_code: str) -> str:
-    return f"{INVITE_URL_PREFIX}/{invite_code}"
+    return f"{settings.frontend_base_url.rstrip('/')}/invite/{invite_code}"

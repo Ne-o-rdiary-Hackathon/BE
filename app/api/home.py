@@ -96,6 +96,8 @@ def create_room(
     user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
+    # Authentication may already have opened a read-only transaction on this session.
+    db.commit()
     for _ in range(5):
         invite_code = generate_invite_code()
         try:
@@ -223,6 +225,8 @@ def join_room_by_invite(
     user_id: int = Depends(get_current_user_id),
     db: Session = Depends(get_db),
 ) -> dict:
+    # Authentication may already have opened a read-only transaction on this session.
+    db.commit()
     with db.begin():
         user_exists = db.execute(
             text("SELECT 1 FROM users WHERE user_id = :user_id"),

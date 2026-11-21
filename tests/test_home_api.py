@@ -3,13 +3,14 @@ from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 import app.api.home_dependencies as home_dependencies
 from app.api.home_dependencies import get_current_user_id
-from app.core.invites import INVITE_URL_PREFIX, build_invite_url
+from app.core.config import settings
+from app.core.invites import build_invite_url
 from app.db.session import get_db
 from app.main import app
 
@@ -87,6 +88,14 @@ def client() -> Iterator[TestClient]:
         yield test_client
     app.dependency_overrides.clear()
     engine.dispose()
+
+
+def test_build_invite_url_uses_configured_frontend_base_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "frontend_base_url", "https://frontend.example/")
+
+    assert build_invite_url("ABC12345") == "https://frontend.example/invite/ABC12345"
 
 
 def test_get_my_rooms_returns_member_counts_and_bingo_progress(client: TestClient) -> None:
@@ -168,7 +177,9 @@ def test_create_room_registers_owner_and_returns_invite_url(client: TestClient) 
     assert data["current_members"] == 1
     assert data["target_bingo"] == 3
     assert data["status"] == "RECRUITING"
-    assert data["invite_url"].startswith(f"{INVITE_URL_PREFIX}/")
+    assert data["invite_url"].startswith(
+        f"{settings.frontend_base_url.rstrip('/')}/invite/"
+    )
     invite_code = data["invite_url"].rsplit("/", 1)[1]
     assert len(invite_code) == 8
     assert invite_code.isalnum() and invite_code == invite_code.upper()
@@ -258,6 +269,43 @@ def test_join_by_invite_rejects_non_recruiting_rooms(client: TestClient) -> None
 
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "ROOM_NOT_RECRUITING"
+
+
+def _authenticate_after_database_read(request, credentials, db):
+    user_id = db.execute(
+        text("SELECT user_id FROM users WHERE user_id = 1")
+    ).scalar_one()
+    return SimpleNamespace(user_id=user_id)
+
+
+def test_create_room_works_after_authenticated_user_lookup(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app.dependency_overrides.pop(get_current_user_id)
+    monkeypatch.setattr(
+        home_dependencies, "get_current_user", _authenticate_after_database_read
+    )
+
+    response = client.post(
+        "/api/rooms",
+        json={"room_name": "로그인 생성", "max_members": 2, "target_bingo": 1},
+    )
+
+    assert response.status_code == 201
+
+
+def test_join_room_works_after_authenticated_user_lookup(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app.dependency_overrides.pop(get_current_user_id)
+    monkeypatch.setattr(
+        home_dependencies, "get_current_user", _authenticate_after_database_read
+    )
+
+    response = client.post("/api/rooms/invite/K7PQ21NM/join")
+
+    assert response.status_code == 201
+    assert response.json()["data"] == {"room_id": 3}
 
 
 def test_home_endpoints_require_authentication(client: TestClient) -> None:

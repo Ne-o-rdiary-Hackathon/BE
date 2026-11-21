@@ -21,7 +21,8 @@ def database_engine() -> Iterator[Engine]:
     )
     with engine.begin() as connection:
         connection.exec_driver_sql(
-            "CREATE TABLE rooms (room_id INTEGER PRIMARY KEY)"
+            "CREATE TABLE rooms ("
+            "room_id INTEGER PRIMARY KEY, status VARCHAR(20) NOT NULL)"
         )
         connection.exec_driver_sql(
             "CREATE TABLE room_members ("
@@ -52,9 +53,13 @@ def database_engine() -> Iterator[Engine]:
             "selection_type VARCHAR(20) NOT NULL, created_at DATETIME NOT NULL, "
             "UNIQUE (response_id, activity_id))"
         )
-        connection.exec_driver_sql("INSERT INTO rooms VALUES (1), (2)")
         connection.exec_driver_sql(
-            "INSERT INTO room_members VALUES (1, 1, 1), (2, 1, 2), (3, 2, 2)"
+            "INSERT INTO rooms VALUES "
+            "(1, 'RECRUITING'), (2, 'RECRUITING'), (3, 'IN_PROGRESS')"
+        )
+        connection.exec_driver_sql(
+            "INSERT INTO room_members VALUES "
+            "(1, 1, 1), (2, 1, 2), (3, 2, 2), (4, 3, 1)"
         )
         connection.exec_driver_sql(
             "INSERT INTO activity_categories VALUES "
@@ -210,6 +215,18 @@ def test_submit_activity_response_rejects_non_members_and_missing_rooms(
     assert forbidden.json()["error"]["code"] == "FORBIDDEN"
     assert missing.status_code == 404
     assert missing.json()["error"]["code"] == "ROOM_NOT_FOUND"
+
+
+def test_submit_activity_response_rejects_non_recruiting_room(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/api/v1/rooms/3/responses/me/submit",
+        json={"desired_activity_ids": [], "bored_activity_ids": []},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "ROOM_NOT_RECRUITING"
 
 
 def test_submit_activity_response_requires_authentication(client: TestClient) -> None:

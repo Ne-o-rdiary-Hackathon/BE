@@ -26,7 +26,7 @@ class ErrorCode(Enum):
     AUTH_CONFIGURATION_ERROR = (500, "로그인 서버 설정이 올바르지 않습니다.")
     INVALID_ACCESS_TOKEN = (401, "로그인 정보가 유효하지 않거나 만료되었습니다.")
     ROOM_NOT_FOUND = (404, "방을 찾을 수 없습니다.")
-    ROOM_NOT_RECRUITING = (409, "모집 중인 방만 참여할 수 있습니다.")
+    ROOM_NOT_RECRUITING = (409, "모집 중인 방에서만 가능한 요청입니다.")
     ROOM_FULL = (409, "방 정원이 가득 찼습니다.")
     INTERNAL_ERROR = (500, "서버 오류가 발생했습니다.")
 

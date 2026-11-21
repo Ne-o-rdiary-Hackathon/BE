@@ -56,6 +56,7 @@ API 문서(자동 생성): http://localhost:8080/docs
 |---|---|---|
 | `DATABASE_URL` | `mysql+pymysql://gachi:gachi1234@localhost:3306/gachi?charset=utf8mb4` | 끝의 `?charset=utf8mb4` 꼭 유지 |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:5173` | 프론트 주소 (쉼표로 여러 개) |
+| `FRONTEND_BASE_URL` | `https://kankan-bingo.vercel.app` | 초대 링크를 만들 프론트엔드 기본 주소 (`.env.example`은 로컬 주소) |
 | `SHOW_SQL` | `false` | `true`면 SQL 로그 출력 |
 | `APP_ENV` | `production` | 앱 실행 환경 |
 | `DEV_AUTH_ENABLED` | `false` | `development` 환경에서만 Swagger 테스트용 사용자 헤더 허용 |

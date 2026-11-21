@@ -8,6 +8,7 @@ class Settings(BaseSettings):
 
     database_url: str = "mysql+pymysql://gachi:gachi1234@localhost:3306/gachi?charset=utf8mb8"
     cors_allowed_origins: str = "http://localhost:3000,http://localhost:5173"
+    frontend_base_url: str = "https://kankan-bingo.vercel.app"
     show_sql: bool = False
 
     kakao_rest_api_key: SecretStr = SecretStr("")

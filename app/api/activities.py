@@ -17,7 +17,7 @@ from app.schemas.activities import (
 )
 from app.schemas.common import (
     ApiResponse,
-    AUTH_VALIDATION_ERROR_RESPONSES,
+    JOIN_ERROR_RESPONSES,
     PUBLIC_ERROR_RESPONSES,
 )
 
@@ -89,7 +89,7 @@ def get_activities(db: Session = Depends(get_db)) -> dict:
     response_model=ApiResponse[ActivitySubmissionResponse],
     summary="활동 선택 최종 제출",
     responses={
-        **AUTH_VALIDATION_ERROR_RESPONSES,
+        **JOIN_ERROR_RESPONSES,
         403: {"model": ApiResponse[None], "description": "해당 방의 참여자가 아닙니다."},
     },
 )
@@ -101,9 +101,12 @@ def submit_activity_response(
 ) -> dict:
     lock_clause = " FOR UPDATE" if db.get_bind().dialect.name == "mysql" else ""
     room = db.execute(
-        text(f"SELECT room_id FROM rooms WHERE room_id = :room_id{lock_clause}"),
+        text(
+            f"SELECT room_id, status FROM rooms "
+            f"WHERE room_id = :room_id{lock_clause}"
+        ),
         {"room_id": room_id},
-    ).scalar_one_or_none()
+    ).mappings().one_or_none()
     if room is None:
         raise BusinessException(ErrorCode.ROOM_NOT_FOUND)
 
@@ -116,6 +119,8 @@ def submit_activity_response(
     ).scalar_one_or_none()
     if is_member is None:
         raise BusinessException(ErrorCode.FORBIDDEN)
+    if room["status"] != "RECRUITING":
+        raise BusinessException(ErrorCode.ROOM_NOT_RECRUITING)
 
     activity_ids = payload.desired_activity_ids + payload.bored_activity_ids
     if activity_ids:
