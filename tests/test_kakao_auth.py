@@ -266,6 +266,7 @@ def test_callback_reports_user_cancellation_and_consumes_state() -> None:
 def test_callback_clears_state_and_sets_http_only_service_cookie(monkeypatch) -> None:
     configure_kakao_settings(monkeypatch)
     monkeypatch.setattr(settings, "frontend_auth_success_url", "http://localhost:3000/auth/callback")
+    monkeypatch.setattr(settings, "auth_cookie_secure", False)
     authenticate = AsyncMock(return_value=SimpleNamespace(user_id=7))
     monkeypatch.setattr(kakao_auth.KakaoAuthService, "authenticate", authenticate)
 
@@ -279,5 +280,26 @@ def test_callback_clears_state_and_sets_http_only_service_cookie(monkeypatch) ->
     assert response.headers["location"] == "http://localhost:3000/auth/callback"
     assert "access_token=" in response.headers["set-cookie"]
     assert "HttpOnly" in response.headers["set-cookie"]
+    assert "SameSite=lax" in response.headers["set-cookie"]
     assert "kakao_oauth_state" in response.headers["set-cookie"]
     assert "access_token" not in response.headers["location"]
+
+
+def test_callback_uses_cross_site_cookie_settings_when_secure(monkeypatch) -> None:
+    configure_kakao_settings(monkeypatch)
+    monkeypatch.setattr(settings, "frontend_auth_success_url", "https://frontend.example/auth/callback")
+    monkeypatch.setattr(settings, "auth_cookie_secure", True)
+    authenticate = AsyncMock(return_value=SimpleNamespace(user_id=7))
+    monkeypatch.setattr(kakao_auth.KakaoAuthService, "authenticate", authenticate)
+
+    response = api_get(
+        "/api/auth/kakao/callback?code=authorization-code&state=state-value",
+        headers={"Cookie": "kakao_oauth_state=state-value"},
+        follow_redirects=False,
+    )
+
+    set_cookie = response.headers["set-cookie"]
+    assert response.status_code == 303
+    assert "SameSite=none" in set_cookie
+    assert "Secure" in set_cookie
+    assert "HttpOnly" in set_cookie

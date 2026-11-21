@@ -108,7 +108,7 @@ async def kakao_callback(
         max_age=settings.jwt_access_token_expire_minutes * 60,
         httponly=True,
         secure=settings.auth_cookie_secure,
-        samesite="lax",
+        samesite="none" if settings.auth_cookie_secure else "lax",
         path="/",
     )
     return response
