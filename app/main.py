@@ -11,7 +11,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.common import BusinessException, ErrorCode, fail
 from app.core.config import settings
-from app.api import health
+from app.api import auth, health
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("backend")
@@ -21,7 +21,7 @@ app = FastAPI(title="Backend API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_allowed_origins,
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -65,3 +65,4 @@ async def handle_unknown(request: Request, e: Exception):
 # 새 라우터를 만들면 여기에 추가: app.include_router(user.router)
 
 app.include_router(health.router)
+app.include_router(auth.router)
