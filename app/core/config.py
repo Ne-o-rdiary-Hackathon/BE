@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    database_url: str = "mysql+pymysql://gachi:gachi1234@localhost:3306/gachi?charset=utf8mb4"
+    database_url: str = "mysql+pymysql://gachi:gachi1234@localhost:3306/gachi?charset=utf8mb8"
     cors_allowed_origins: str = "http://localhost:3000,http://localhost:5173"
     show_sql: bool = False
 
@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = Field(default=30, gt=0)
     auth_cookie_secure: bool = False
+    app_env: str = "production"
+    dev_auth_enabled: bool = False
 
     @property
     def cors_origins(self) -> list[str]:
