@@ -9,6 +9,7 @@ description = "FastAPI backend for the hackathon project"
 requires-python = ">=3.10"
 dependencies = [
     "alembic>=1.13",
+    "boto3>=1.34",
     "cryptography>=42",
     "fastapi>=0.115",
     "httpx>=0.27",
@@ -16,6 +17,7 @@ dependencies = [
     "pydantic-settings>=2.2",
     "PyJWT>=2.8",
     "pymysql>=1.1",
+    "python-multipart>=0.0.9",
     "python-dotenv>=1.0",
     "sqlalchemy>=2.0",
     "tzdata",

@@ -2,16 +2,18 @@
 API 문서(자동 생성): http://localhost:8080/docs
 """
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.common import BusinessException, ErrorCode, fail
 from app.core.config import settings
-from app.api import auth, health
+from app.api import auth, bingo, health
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("backend")
@@ -66,3 +68,9 @@ async def handle_unknown(request: Request, e: Exception):
 
 app.include_router(health.router)
 app.include_router(auth.router)
+app.include_router(bingo.router)
+
+# S3를 설정하지 않은 개발 환경에서는 인증 사진을 로컬 폴더에서 제공합니다.
+if not settings.s3_bucket:
+    Path(settings.upload_dir).mkdir(parents=True, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=settings.upload_dir), name="uploads")
