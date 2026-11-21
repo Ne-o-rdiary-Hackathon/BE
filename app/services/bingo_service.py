@@ -33,7 +33,6 @@ from app.services.image_storage import ImageStorage, detect_image_type
 BOARD_SIZE = 3
 CELL_COUNT = BOARD_SIZE * BOARD_SIZE
 CENTER = 4
-MAX_RESETS = 1  # 방장이 빙고판을 다시 돌릴 수 있는 횟수
 LINES: tuple[tuple[int, int, int], ...] = (
     (0, 1, 2), (3, 4, 5), (6, 7, 8),  # 가로
     (0, 3, 6), (1, 4, 7), (2, 5, 8),  # 세로
@@ -77,7 +76,7 @@ class BingoService:
             board = BingoBoard(room_id=room_id, board_size=BOARD_SIZE)
             self.db.add(board)
             self.db.flush()
-            self._fill_cells(board, room_id, votes, exclude=set())
+            self._fill_cells(board, room_id, votes)
             room.status = RoomStatus.IN_PROGRESS
             self.db.commit()
         except IntegrityError:
@@ -88,60 +87,10 @@ class BingoService:
             raise
 
         self.db.refresh(board)
-        return self._board_response(room, board, votes, user)
+        return self._board_response(room, board, votes)
 
-    # ───────────────────────── BINGO-03 빙고판 다시 돌리기 (방장, 1회) ─────────────────────────
-
-    def reset_board(self, room_id: int, user: User) -> BingoBoardResponse:
-        try:
-            room = self._lock_room(room_id)
-            self._ensure_member(room_id, user)
-            if room.owner_id != user.user_id:
-                raise BusinessException(ErrorCode.NOT_ROOM_OWNER)
-            board = self.db.scalar(
-                select(BingoBoard)
-                .where(BingoBoard.room_id == room_id)
-                .with_for_update()
-                .execution_options(populate_existing=True)
-            )
-            if board is None:
-                raise BusinessException(ErrorCode.BOARD_NOT_FOUND)
-            if room.status != RoomStatus.IN_PROGRESS:
-                raise BusinessException(ErrorCode.ROOM_NOT_IN_PROGRESS)
-            if board.reset_count >= MAX_RESETS:
-                raise BusinessException(ErrorCode.RESET_LIMIT_EXCEEDED)
-
-            cells = list(self.db.scalars(
-                select(BingoCell)
-                .where(BingoCell.board_id == board.board_id)
-                .with_for_update()
-                .execution_options(populate_existing=True)
-            ).unique())
-            if any(c.status == CellStatus.COMPLETED for c in cells):
-                raise BusinessException(ErrorCode.RESET_AFTER_VERIFICATION)
-
-            # 지금 칸의 활동은 최대한 빼고 새로 뽑습니다.
-            previous = {c.activity_id for c in cells}
-            for cell in cells:
-                self.db.delete(cell)
-            self.db.flush()
-
-            votes = self._activity_votes(room_id)
-            self._fill_cells(board, room_id, votes, exclude=previous)
-            board.reset_count += 1
-            board.generated_at = now_kst()
-            self.db.commit()
-        except Exception:
-            self.db.rollback()
-            raise
-
-        self.db.refresh(board)
-        return self._board_response(room, board, votes, user)
-
-    def _fill_cells(
-        self, board: BingoBoard, room_id: int, votes: dict[int, tuple[int, int]], exclude: set[int]
-    ) -> None:
-        chosen = self._choose_activities(votes, exclude)
+    def _fill_cells(self, board: BingoBoard, room_id: int, votes: dict[int, tuple[int, int]]) -> None:
+        chosen = self._choose_activities(votes)
         member_count = self.db.scalar(
             select(func.count()).select_from(RoomMember).where(RoomMember.room_id == room_id)
         ) or 1
@@ -163,15 +112,15 @@ class BingoService:
             ))
         self.db.flush()
 
-    def _choose_activities(self, votes: dict[int, tuple[int, int]], exclude: set[int]) -> list[Activity]:
+    def _choose_activities(self, votes: dict[int, tuple[int, int]]) -> list[Activity]:
         activities = list(self.db.scalars(select(Activity).where(Activity.is_active.is_(True))))
         if len(activities) < CELL_COUNT:
             raise BusinessException(ErrorCode.NOT_ENOUGH_ACTIVITIES)
 
         def rank(activity: Activity):
             desired, bored = votes.get(activity.activity_id, (0, 0))
-            # 제외 대상은 맨 뒤 → 점수 높은 순 → 하고 싶은 사람 많은 순 → 같으면 무작위
-            return activity.activity_id in exclude, -(desired - bored), -desired, _rng.random()
+            # 점수 높은 순 → 하고 싶은 사람 많은 순 → 같으면 무작위
+            return -(desired - bored), -desired, _rng.random()
 
         return sorted(activities, key=rank)[:CELL_COUNT]
 
@@ -181,7 +130,7 @@ class BingoService:
         room = self._get_room(room_id)
         self._ensure_member(room_id, user)
         board = self._get_board(room_id)
-        return self._board_response(room, board, self._activity_votes(room_id), user)
+        return self._board_response(room, board, self._activity_votes(room_id))
 
     # ───────────────────────── VERIFY-01 사진 인증 ─────────────────────────
 
@@ -355,7 +304,7 @@ class BingoService:
         )
 
     def _board_response(
-        self, room: Room, board: BingoBoard, votes: dict[int, tuple[int, int]], user: User
+        self, room: Room, board: BingoBoard, votes: dict[int, tuple[int, int]]
     ) -> BingoBoardResponse:
         done = {c.position for c in board.cells if c.status == CellStatus.COMPLETED}
         lines = completed_lines(done)
@@ -364,8 +313,6 @@ class BingoService:
         ).unique()
         return BingoBoardResponse(
             room_name=room.room_name,
-            is_owner=room.owner_id == user.user_id,
-            reset_remaining=max(MAX_RESETS - board.reset_count, 0),
             members=[
                 BoardMemberResponse(
                     user_id=m.user_id,

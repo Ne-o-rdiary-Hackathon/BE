@@ -35,11 +35,9 @@ class BoardMemberResponse(BaseModel):
 
 
 class BingoBoardResponse(BaseModel):
-    """BINGO-01, BINGO-02, BINGO-03"""
+    """BINGO-01, BINGO-02"""
 
     room_name: str
-    is_owner: bool
-    reset_remaining: int
     members: list[BoardMemberResponse]
     room_status: str
     target_bingo: int

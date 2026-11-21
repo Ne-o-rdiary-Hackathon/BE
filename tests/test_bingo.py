@@ -227,46 +227,14 @@ def test_room_completes_at_target_and_result(env) -> None:
     assert len(result["cells"]) == 9
 
 
-def test_board_includes_room_name_members_and_reset_info(env) -> None:
+def test_board_includes_room_name_and_members(env) -> None:
     data = call("POST", "/api/rooms/1/bingo-board").json()["data"]
     assert data["room_name"] == "퇴근 후 도파민 수혈단"
-    assert data["is_owner"] is True and data["reset_remaining"] == 1
     assert data["members"] == [
         {"user_id": OWNER, "nickname": "김민지", "profile_image_url": "https://p/1.jpg", "role": "OWNER"},
         {"user_id": MEMBER, "nickname": "이서현", "profile_image_url": None, "role": "MEMBER"},
     ]
 
     env["state"]["user_id"] = MEMBER
-    assert call("GET", "/api/rooms/1/bingo-board").json()["data"]["is_owner"] is False
+    assert call("GET", "/api/rooms/1/bingo-board").json()["data"]["members"] == data["members"]
 
-
-def test_reset_board_once_with_new_activities(env) -> None:
-    before = call("POST", "/api/rooms/1/bingo-board").json()["data"]
-    old_names = {c["activity_name"] for c in before["cells"]}
-
-    res = call("POST", "/api/rooms/1/bingo-board/reset")
-    assert res.status_code == 200, res.text
-    after = res.json()["data"]
-    assert after["reset_remaining"] == 0
-    assert [c["position"] for c in after["cells"]] == list(range(9))
-    assert all(c["status"] == "PENDING" for c in after["cells"])
-    new_names = {c["activity_name"] for c in after["cells"]}
-    # 활동 12개 중 기존 9개를 최대한 빼므로 새 활동 3개는 반드시 들어가고, 겹치는 건 6개뿐
-    assert len(new_names - old_names) == 3 and len(new_names & old_names) == 6
-
-    res = call("POST", "/api/rooms/1/bingo-board/reset")
-    assert res.status_code == 400 and res.json()["error"]["code"] == "RESET_LIMIT_EXCEEDED"
-
-
-def test_reset_board_rules(env) -> None:
-    assert call("POST", "/api/rooms/1/bingo-board/reset").json()["error"]["code"] == "BOARD_NOT_FOUND"
-    call("POST", "/api/rooms/1/bingo-board")
-
-    env["state"]["user_id"] = MEMBER
-    assert call("POST", "/api/rooms/1/bingo-board/reset").json()["error"]["code"] == "NOT_ROOM_OWNER"
-
-    verify(cell_at(env, 0))
-    env["state"]["user_id"] = OWNER
-    res = call("POST", "/api/rooms/1/bingo-board/reset")
-    assert res.status_code == 400 and res.json()["error"]["code"] == "RESET_AFTER_VERIFICATION"
-    assert call("GET", "/api/rooms/1/bingo-board").json()["data"]["reset_remaining"] == 1

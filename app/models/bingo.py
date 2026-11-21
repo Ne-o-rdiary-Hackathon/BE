@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, UniqueConstraint, text
+from sqlalchemy import DateTime, ForeignKey, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, now_kst
@@ -20,7 +20,6 @@ class BingoBoard(Base):
     board_id: Mapped[int] = mapped_column(BigId, primary_key=True, autoincrement=True)
     room_id: Mapped[int] = mapped_column(BigId, ForeignKey("rooms.room_id"), unique=True, nullable=False)
     board_size: Mapped[int] = mapped_column(TinyInt, default=3, nullable=False)
-    reset_count: Mapped[int] = mapped_column(TinyInt, default=0, server_default=text("0"), nullable=False)
     generated_at: Mapped[datetime] = mapped_column(DateTime, default=now_kst, nullable=False)
 
     cells: Mapped[list["BingoCell"]] = relationship(
