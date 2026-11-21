@@ -17,6 +17,14 @@ class ErrorCode(Enum):
     FORBIDDEN = (403, "권한이 없습니다.")
     NOT_FOUND = (404, "요청한 경로를 찾을 수 없습니다.")
     METHOD_NOT_ALLOWED = (405, "지원하지 않는 요청 방식입니다.")
+    OAUTH_STATE_INVALID = (400, "로그인 요청이 만료되었거나 올바르지 않습니다.")
+    OAUTH_USER_CANCELLED = (400, "카카오 로그인이 취소되었습니다.")
+    OAUTH_AUTHORIZATION_FAILED = (400, "카카오 인증을 완료하지 못했습니다.")
+    OAUTH_CODE_INVALID = (400, "카카오 인증 코드가 유효하지 않습니다.")
+    OAUTH_PROVIDER_ERROR = (502, "카카오 인증 서비스와 통신하지 못했습니다.")
+    OAUTH_PROVIDER_TIMEOUT = (504, "카카오 인증 서비스 응답 시간이 초과되었습니다.")
+    AUTH_CONFIGURATION_ERROR = (500, "로그인 서버 설정이 올바르지 않습니다.")
+    INVALID_ACCESS_TOKEN = (401, "로그인 정보가 유효하지 않거나 만료되었습니다.")
     INTERNAL_ERROR = (500, "서버 오류가 발생했습니다.")
 
     @property
