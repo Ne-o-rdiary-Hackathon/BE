@@ -1,9 +1,9 @@
-# Backend (Python / FastAPI 기본 뼈대)
+# Backend (Python / FastAPI)
 
-기획 확정 전, 기능 없이 **공통 설정만** 들어 있는 프로젝트입니다.
+FastAPI와 MySQL을 사용하는 백엔드입니다.
 
-- Python 3.10+, FastAPI, SQLAlchemy 2.0, MySQL 8
-- 들어 있는 것: MySQL 연결, 공통 응답 형식, 에러 처리, CORS, 생성/수정 시각 공통 컬럼, 상태 확인 API
+- Python 3.10+, FastAPI, SQLAlchemy 2.0, MySQL 8, Alembic
+- 공통 설정, DB 연결, 예외 처리, CORS, 상태 확인 API 포함
 
 ## 1. MySQL 띄우기
 
@@ -26,7 +26,7 @@ FLUSH PRIVILEGES;
 ```bash
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -e ".[dev]"
 
 cp .env.example .env             # Windows: copy .env.example .env
 
@@ -61,25 +61,35 @@ API 문서(자동 생성): http://localhost:8080/docs
 
 **에러** — `app/common.py`의 `ErrorCode`에 추가하고 `raise BusinessException(ErrorCode.XXX)`
 
-**테이블** — 생성/수정 시각이 필요하면 `class User(TimestampMixin, Base)`
+**테이블** — `app/models/`에 SQLAlchemy 모델을 만들고 생성/수정 시각이 필요하면 `TimestampMixin`을 사용합니다.
+
+**마이그레이션** — 모델을 추가한 뒤 변경 이력을 생성하고 적용합니다.
+```bash
+alembic revision --autogenerate -m "create user"
+alembic upgrade head
+```
+모델은 `app/models/__init__.py`에서 import해야 Alembic 자동 생성 대상에 포함됩니다.
 
 ## 5. 구조
 
 ```
 app/
-├── main.py          앱 시작, CORS, 예외 → 공통 응답, 라우터 등록
-├── config.py        환경변수
-├── database.py      DB 연결, Base, TimestampMixin, get_db
-├── common.py        공통 응답(ok/fail), ErrorCode, BusinessException
-└── routers/
-    └── health.py    /api/health
+├── main.py              앱 시작, CORS, 예외 처리, 라우터 등록
+├── common.py            공통 응답(ok/fail), ErrorCode, BusinessException
+├── core/config.py       환경변수
+├── db/
+│   ├── base.py          SQLAlchemy Base, TimestampMixin
+│   └── session.py       DB 연결, SessionLocal, get_db
+├── models/              SQLAlchemy 모델
+├── schemas/             요청·응답 DTO
+├── api/                 라우터
+│   └── health.py        /api/health
+├── services/            비즈니스 로직
+└── repositories/        DB 조회·저장
+alembic/                 DB 마이그레이션 설정과 버전 파일
+tests/                   테스트 코드
+pyproject.toml           의존성 및 프로젝트 설정
+.env                     로컬 환경변수 (git 제외)
 ```
 
-기능을 추가할 때 추천 구조:
-```
-app/
-├── models/          테이블 (예: user.py)  → main.py에서 import 해야 테이블 생성됨
-├── schemas/         요청/응답 형식 (Pydantic)
-├── services/        비즈니스 로직
-└── routers/         API 경로 → main.py에서 app.include_router(...)
-```
+테스트 실행: `pytest`
