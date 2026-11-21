@@ -2,7 +2,6 @@
 API 문서(자동 생성): http://localhost:8080/docs
 """
 import logging
-from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -11,27 +10,14 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.common import BusinessException, ErrorCode, fail
-from app.config import settings
-from app.database import Base, engine
-from app.routers import health
-
-# 새 모델 파일을 만들면 여기서 import 해야 테이블이 자동 생성됩니다.
-# from app.models import user  # noqa: F401
+from app.core.config import settings
+from app.api import health
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("backend")
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    try:
-        Base.metadata.create_all(bind=engine)  # 모델 기준으로 없는 테이블 생성
-    except Exception:
-        log.exception("DB 연결 실패: MySQL이 켜져 있는지, DATABASE_URL이 맞는지 확인하세요.")
-    yield
-
-
-app = FastAPI(title="Backend API", lifespan=lifespan)
+app = FastAPI(title="Backend API")
 
 app.add_middleware(
     CORSMiddleware,
