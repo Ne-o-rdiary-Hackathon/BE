@@ -1,0 +1,24 @@
+# 로컬 개발용 MySQL. 실행: docker compose up -d
+# .env.example의 DATABASE_URL과 아이디/비밀번호가 맞춰져 있습니다.
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: gachi-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: gachi
+      MYSQL_USER: gachi
+      MYSQL_PASSWORD: gachi1234
+      MYSQL_ROOT_PASSWORD: root1234
+      TZ: Asia/Seoul
+    command:
+      # 활동 데이터에 이모지(🧗 등)가 있어서 utf8mb4 필수
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - gachi-mysql-data:/var/lib/mysql
+
+volumes:
+  gachi-mysql-data:
