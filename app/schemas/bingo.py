@@ -27,9 +27,20 @@ class BingoCellResponse(BaseModel):
     image_url: str | None
 
 
-class BingoBoardResponse(BaseModel):
-    """BINGO-01, BINGO-02"""
+class BoardMemberResponse(BaseModel):
+    user_id: int
+    nickname: str
+    profile_image_url: str | None
+    role: str
 
+
+class BingoBoardResponse(BaseModel):
+    """BINGO-01, BINGO-02, BINGO-03"""
+
+    room_name: str
+    is_owner: bool
+    reset_remaining: int
+    members: list[BoardMemberResponse]
     room_status: str
     target_bingo: int
     achieved_bingo: int
