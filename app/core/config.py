@@ -1,5 +1,5 @@
 """환경변수 설정. 프로젝트 루트의 .env 파일도 읽습니다."""
-from pydantic import Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,6 +24,15 @@ class Settings(BaseSettings):
     s3_bucket: str = ""
     aws_region: str = "ap-northeast-2"
     upload_dir: str = "uploads"
+
+    # 빙고 미션 문구 AI. 키가 비어 있으면 활동 이름을 그대로 씁니다.
+    # .env에서 OPENAI_API_KEY 와 OPENAI-API-KEY 둘 다 읽음
+    openai_api_key: SecretStr = Field(
+        default=SecretStr(""),
+        validation_alias=AliasChoices("OPENAI_API_KEY", "OPENAI-API-KEY", "openai_api_key"),
+    )
+    openai_model: str = "gpt-5.6-luna"
+    mission_ai_timeout_seconds: float = 8.0
 
     @property
     def cors_origins(self) -> list[str]:

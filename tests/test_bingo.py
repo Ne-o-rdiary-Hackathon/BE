@@ -238,3 +238,41 @@ def test_board_includes_room_name_and_members(env) -> None:
     env["state"]["user_id"] = MEMBER
     assert call("GET", "/api/rooms/1/bingo-board").json()["data"]["members"] == data["members"]
 
+
+
+def test_board_uses_ai_mission_text(env, monkeypatch) -> None:
+    from app.services import bingo_service
+
+    calls = []
+
+    def fake_write_missions(names):
+        calls.append(list(names))
+        # 첫 칸만 AI 문구가 왔다고 가정 (나머지는 write_missions가 활동 이름을 돌려준 상황)
+        return [f"{names[0]} 완등"] + list(names[1:])
+
+    monkeypatch.setattr(bingo_service, "write_missions", fake_write_missions)
+    data = call("POST", "/api/rooms/1/bingo-board").json()["data"]
+
+    # AI에는 고른 9개 활동 이름이 1위(가운데 칸)부터 순서대로 전달됨
+    assert len(calls) == 1 and len(calls[0]) == 9
+    center = next(c for c in data["cells"] if c["position"] == 4)
+    assert calls[0][0] == center["activity_name"]
+    assert center["mission_text"] == f"{center['activity_name']} 완등"
+    assert all(c["mission_text"] == c["activity_name"] for c in data["cells"] if c["position"] != 4)
+
+    # DB에 저장돼서 조회·인증·결과에서도 같은 문구
+    board = call("GET", "/api/rooms/1/bingo-board").json()["data"]
+    assert next(c for c in board["cells"] if c["position"] == 4)["mission_text"] == center["mission_text"]
+    verified = verify(center["cell_id"]).json()["data"]
+    assert verified["cell"]["mission_text"] == center["mission_text"]
+    result = call("GET", "/api/rooms/1/result").json()["data"]
+    assert next(c for c in result["cells"] if c["position"] == 4)["mission_text"] == center["mission_text"]
+
+
+def test_old_board_without_mission_text_uses_activity_name(env) -> None:
+    call("POST", "/api/rooms/1/bingo-board")
+    with env["Session"]() as db:
+        db.execute(text("UPDATE bingo_cells SET mission_text = NULL"))
+        db.commit()
+    cells = call("GET", "/api/rooms/1/bingo-board").json()["data"]["cells"]
+    assert all(c["mission_text"] == c["activity_name"] for c in cells)

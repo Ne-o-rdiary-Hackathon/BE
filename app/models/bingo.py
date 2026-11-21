@@ -39,6 +39,7 @@ class BingoCell(Base):
     activity_id: Mapped[int] = mapped_column(BigId, ForeignKey("activities.activity_id"), nullable=False)
     position: Mapped[int] = mapped_column(TinyInt, nullable=False)
     match_rate: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("0.00"), nullable=False)
+    mission_text: Mapped[str | None] = mapped_column(String(50))
     status: Mapped[str] = mapped_column(String(20), default=CellStatus.PENDING, nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime)
 
